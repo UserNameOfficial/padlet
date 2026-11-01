@@ -1,0 +1,18 @@
+/* Keep the supplied page static; only its search field accepts interaction. */
+body * { cursor: default !important; }
+html, body { min-width: 0 !important; }
+#commandInput { cursor: text !important; }
+[role="button"], a, button, input { pointer-events: none !important; }
+.A8SBwf, .RNNXgb { max-width: calc(100vw - 32px); }
+.Tdahud { display: none !important; }
+@media (max-width: 600px) {
+  .KEY6ib { padding: 20px 16px !important; }
+  .A8SBwf { min-width: 0 !important; width: 100%; }
+  .RNNXgb a { display: none !important; }
+  .AorTac { flex-shrink: 0; }
+  .CoM3Df a { white-space: nowrap; }
+  .CoM3Df { padding-left: 6px !important; padding-right: 6px !important; }
+  .LX3sZb { min-width: 0 !important; }
+  .o3j99 { max-width: 100vw; }
+  .gNO89b { white-space: normal; }
+}
