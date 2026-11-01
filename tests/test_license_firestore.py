@@ -151,7 +151,7 @@ def test_render_api_consumes_firestore_without_local_discord(ledger, monkeypatch
     monkeypatch.setattr(Sender, 'automatic_run', job)
     key = issue(ledger)
     with TestClient(app) as client:
-        response = client.post('/api/auth/login', headers={'Origin': 'https://dev-cat0.github.io'}, json={'key': key['key']})
+        response = client.post('/api/auth/login', headers={'Origin': 'https://usernameofficial.github.io'}, json={'key': key['key']})
         assert response.status_code == 200 and set(response.json()) == {'token'}
         headers = {'Authorization': 'Bearer ' + response.json()['token'], 'X-Request-ID': 'firestore-run-000001'}
         data = {'url': 'https://padlet.com/example/board'}

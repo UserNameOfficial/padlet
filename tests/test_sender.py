@@ -31,9 +31,9 @@ def test_private_endpoints_fail_closed(client):
 
 def test_state_hides_secrets_and_cors(client):
     auth = session_auth(client)
-    response = client.get('/api/state', headers={**auth,'Origin':'https://dev-cat0.github.io'})
+    response = client.get('/api/state', headers={**auth,'Origin':'https://usernameofficial.github.io'})
     assert response.status_code == 200
-    assert response.headers['access-control-allow-origin'] == 'https://dev-cat0.github.io'
+    assert response.headers['access-control-allow-origin'] == 'https://usernameofficial.github.io'
     assert response.headers['cache-control'] == 'no-store'
     assert not {'headers','template','endpoint'} & response.json().keys()
     response = client.get('/api/state', headers={**auth,'Origin':'https://evil.example'})
@@ -65,7 +65,7 @@ def test_automatic_sessions_are_isolated_and_resume(client):
 
 def test_session_creation_checks_origin_and_rate_limit(client):
     assert client.post('/api/session', headers={'Origin':'https://evil.example'}, json={}).status_code == 403
-    assert client.post('/api/session', headers={'Origin':'https://dev-cat0.github.io'}, json={}).status_code == 403
+    assert client.post('/api/session', headers={'Origin':'https://usernameofficial.github.io'}, json={}).status_code == 403
 
 
 def test_session_cleanup_expires_idle_but_keeps_running():

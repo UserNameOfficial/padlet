@@ -72,6 +72,29 @@ def test_plan_post_limit_before_charge(ledger, monkeypatch, kind, limit, endpoin
         assert access['post_limit'] == (1000000 if kind == 'forever' else 5000)
 
 
+@pytest.mark.parametrize('origin, allowed', [
+    ('https://usernameofficial.github.io', True),
+    ('https://dev-cat0.github.io', False),
+    ('https://usernameofficial.github.io.evil.example', False),
+])
+def test_transferred_panel_origin_preflight_and_login(ledger, origin, allowed):
+    from server.app import app
+
+    key = issue(ledger)
+    with TestClient(app) as client:
+        preflight = client.options('/api/auth/login', headers={
+            'Origin': origin,
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'authorization,content-type',
+        })
+        assert preflight.status_code == (200 if allowed else 400)
+        assert preflight.headers.get('access-control-allow-origin') == (origin if allowed else None)
+        login = client.post('/api/auth/login', headers={'Origin': origin}, json={'key': key['key']})
+        assert login.status_code == (200 if allowed else 403)
+        assert ('token' in login.json()) is allowed
+        assert key['key'] not in login.text
+
+
 @pytest.mark.parametrize('amount', [1, 2, 3])
 def test_login_run_stop_repeat_without_bot(ledger, monkeypatch, amount):
     from server.app import app
@@ -91,7 +114,7 @@ def test_login_run_stop_repeat_without_bot(ledger, monkeypatch, amount):
     key = issue(ledger, amount)
     with TestClient(app) as client:
         # No Discord process, socket or mocked authorization response exists here.
-        origin = {'Origin': 'https://dev-cat0.github.io'}
+        origin = {'Origin': 'https://usernameofficial.github.io'}
         login = client.post('/api/auth/login', headers=origin, json={'key': key['key']})
         assert login.status_code == 200 and set(login.json()) == {'token'}
         assert key['key'] not in login.text
