@@ -58,7 +58,7 @@ def main():
         assert page.locator('#body').input_value() == ''
         assert page.locator('#url').input_value() == ''
         page.locator('#disguise').click()
-        page.wait_for_url('**/Google.html')
+        page.wait_for_url('**/Google.html?v=commands-3')
         field = page.locator('#commandInput')
         field.wait_for()
         assert page.title() == 'Google'
@@ -72,7 +72,7 @@ def main():
         # Clicking every apparent button/link must neither navigate nor send a command.
         field.fill(f'{BOARD}, Search title, Search body, 10, 0.5')
         page.evaluate("document.querySelectorAll('a,button,input,[role=button]').forEach(el=>el.click())")
-        assert page.url == SITE + 'Google.html' and len(calls) == before
+        assert page.url == SITE + 'Google.html?v=commands-3' and len(calls) == before
         for invalid in ['hello', f'{BOARD}, 10, .5', f'{BOARD}, password, 10, .5',
                         f'{BOARD}, title, body, 1.5, .3', f'{BOARD}, title, body, -1, .3',
                         f'{BOARD}, title, body, 10, NaN', f'{BOARD}, title, body, 10, Infinity',
@@ -106,7 +106,7 @@ def main():
         page.locator('#stop').click()
         page.wait_for_function("() => document.getElementById('phase').textContent.includes('중지')")
         page.locator('#disguise').click()
-        page.wait_for_url('**/Google.html')
+        page.wait_for_url('**/Google.html?v=commands-3')
         field = page.locator('#commandInput')
         field.fill(f'({BOARD}), (fixture-password), (New title), (New body), (3), (0.25)')
         field.press('Enter')
@@ -128,6 +128,16 @@ def main():
         assert runs[-1] == dict(url=BOARD, password='pass,word', subject='제목, 하나',
                                body='본문에 "따옴표"', limit=2, delay=1)
         assert page.evaluate('JSON.stringify({...sessionStorage,...localStorage})') == '{"padlet-session":"fixture-session"}'
+        # Reported command: Unicode body, three-digit count, and zero delay are valid.
+        state.update(opening=False, phase='finished')
+        reported_board = 'https://padlet.com/olivermooredgb881/padlet-s0251vhndhqfxi0knik5'
+        field.fill(f'{reported_board}, Test, 야기분, 523, 0')
+        field.press('Enter')
+        page.wait_for_timeout(200)
+        runs = [data for path, data in calls if path == '/api/run']
+        assert len(runs) == 4
+        assert runs[-1] == dict(url=reported_board, subject='Test', body='야기분', limit=523, delay=0)
+        assert field.input_value() == ''
         page.screenshot(path=str(ROOT / '.local/disguise-desktop.png'))
         page.set_viewport_size({'width': 390, 'height': 844})
         page.screenshot(path=str(ROOT / '.local/disguise-mobile.png'))

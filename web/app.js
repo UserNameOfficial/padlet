@@ -47,7 +47,7 @@ $('reauth').onclick=beginAuth;
 $('disguise').onclick=()=>{
   try { sessionStorage.removeItem('padlet-disguise-draft'); } catch (_) {}
   $('boardPassword').value='';
-  window.location.assign('./Google.html');
+  window.location.assign('./Google.html?v=commands-3');
 };
 function accessBlocked(access) {
   return !access?.known || access.can_run===false || access.remaining===0 ||
