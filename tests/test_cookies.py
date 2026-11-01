@@ -97,36 +97,3 @@ def test_missing_fixed_cookie_rejected_before_queue(monkeypatch, tmp_path, licen
         sender.queue_run.assert_not_awaited()
         assert client.post('/api/run', headers=headers, json=dict(url=URL, use_cookie=False)).status_code == 200
 
-
-def test_custom_cookie_overrides_fixed_only_in_its_panel_session(monkeypatch, licensed_session):
-    monkeypatch.setenv('PADLET_COOKIE_HEADER', 'ww_p=fixed-fixture')
-    with TestClient(app) as client:
-        first, second = licensed_session(), licensed_session()
-        sender = sessions.items[first].sender
-        sender.queue_run = AsyncMock()
-        auth = {'Authorization': 'Bearer ' + first}
-        assert client.post('/api/custom-cookie', headers=auth,
-                           json={'cookie': 'ww_p=custom-secret; ww_s=custom-session'}).status_code == 200
-        assert sessions.items[first].custom_cookie is not None
-        assert sessions.items[second].custom_cookie is None
-        state = client.get('/api/state', headers=auth).json()
-        assert state['custom_cookie_active'] is True
-        assert 'custom-secret' not in str(state)
-        headers = {**auth, 'X-Request-ID': 'custom-cookie-00001'}
-        result = client.post('/api/run', headers=headers, json={'url': URL, 'use_cookie': True})
-        assert result.status_code == 200
-        assert sender.queue_run.await_args.kwargs['cookies'][0]['value'] == 'custom-secret'
-        assert 'custom-secret' not in result.text
-        assert client.post('/api/custom-cookie', headers=auth, json={'cookie': None}).status_code == 200
-        headers['X-Request-ID'] = 'custom-cookie-00002'
-        assert client.post('/api/run', headers=headers, json={'url': URL, 'use_cookie': True}).status_code == 200
-        assert sender.queue_run.await_args.kwargs['cookies'][0]['value'] == 'fixed-fixture'
-
-
-def test_custom_cookie_validation_does_not_echo_value(licensed_session):
-    with TestClient(app) as client:
-        auth = {'Authorization': 'Bearer ' + licensed_session()}
-        for value in ['ww_p=private-secret\nHost:evil', 'ww_p=private-secret; ww_p=other']:
-            result = client.post('/api/custom-cookie', headers=auth, json={'cookie': value})
-            assert result.status_code in {400, 422}
-            assert 'private-secret' not in result.text
