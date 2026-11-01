@@ -197,12 +197,14 @@ class BrowserSession:
         self.context.on("page", self.select_page)
         self.context.on("response", self.observe)
 
-    async def open(self, url, password=None):
+    async def open(self, url, password=None, cookies=None):
         await self.initialize()
+        if cookies:
+            await self.context.add_cookies(cookies)
         self.page = await self.context.new_page()
         # Deferred app bundles can stall DOMContentLoaded after the inline guest
         # bootstrap is already ready. Automatic jobs only need that bootstrap.
-        self.sender.log("게시판 접속 · 익명 세션 정보를 확인합니다.")
+        self.sender.log("게시판 접속 · 쿠키 로그인 정보를 확인합니다." if cookies else "게시판 접속 · 익명 세션 정보를 확인합니다.")
         try:
             response = await self.page.goto(padlet_url(url),
                 wait_until="domcontentloaded" if self.capture_enabled else "commit", timeout=40000)

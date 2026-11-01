@@ -35,11 +35,14 @@ def check_response(response, stage):
         raise ValueError("게시판 응답이 너무 큽니다.")
 
 
-def build_template(state, require_write=True):
+def build_template(state, require_write=True, use_cookie=False):
     wall, user = state.get("wall") or {}, state.get("user") or {}
     if wall.get("frozen") or require_write and (state.get("canIWrite") is not True or state.get("isReadOnly")):
-        raise ValueError("이 게시판은 현재 익명 글쓰기를 허용하지 않습니다.")
-    if user.get("registered_at") or user.get("username") or user.get("email"):
+        raise ValueError("이 게시판은 현재 해당 계정의 글쓰기를 허용하지 않습니다." if use_cookie else "이 게시판은 현재 익명 글쓰기를 허용하지 않습니다.")
+    registered = bool(user.get("registered_at") or user.get("username") or user.get("email"))
+    if use_cookie and not registered:
+        raise ValueError("고정 쿠키의 로그인 상태를 확인할 수 없습니다. 관리자에게 쿠키 갱신을 요청하세요.")
+    if not use_cookie and registered:
         raise ValueError("익명 방문자 세션을 확인할 수 없습니다.")
     if wall.get("is_archived") or wall.get("is_trashed"):
         raise ValueError("보관되었거나 삭제된 게시판입니다.")

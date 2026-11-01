@@ -40,7 +40,7 @@ def main():
             mime="text/html" if path=="/" else "text/css" if path.endswith("css") else "application/javascript"
             route.fulfill(content_type=mime,body=(ROOT/"web"/names[path]).read_text(encoding="utf-8"))
         page.route("**/*",route)
-        page.goto("https://dev-cat0.github.io/")
+        page.goto("https://usernameofficial.github.io/")
         page.locator('#accessKey').wait_for()
         assert page.locator('#authGate').is_visible()
         assert page.locator('#panel').evaluate('(el) => el.inert')
@@ -59,7 +59,9 @@ def main():
         page.locator('#keySubmit').click()
         page.wait_for_function("() => !document.getElementById('start').disabled")
         assert page.locator('#authGate').is_hidden()
-        assert page.locator("#sendForm input,#sendForm textarea").count()==7
+        assert page.locator("#sendForm input,#sendForm textarea").count()==8
+        assert not page.locator('#useCookie').is_checked()
+        assert page.locator('input[id*=cookie i],textarea[id*=cookie i]').count() == 1
         assert page.locator('#passwordSettings').is_hidden()
         assert page.locator('#boardPassword').is_disabled()
         page.locator('#passwordEnabled').check()
@@ -88,12 +90,14 @@ def main():
         page.locator("#delay").fill("0.5")
         page.locator('#passwordEnabled').check()
         page.locator('#boardPassword').fill('board-password-fixture')
+        page.locator('#useCookie').check()
         page.locator("#start").click()
         page.wait_for_function("() => !document.getElementById('stop').disabled")
         assert calls==[{"url":"https://padlet.com/example/board","subject":"Test title","body":"Test body","limit":3,"delay":.5,
-                       "password":"board-password-fixture"}]
+                       "password":"board-password-fixture", "use_cookie":True}]
         assert page.locator('#boardPassword').input_value() == ''
         assert page.locator('#passwordEnabled').is_disabled()
+        assert page.locator('#useCookie').is_disabled()
         assert page.locator("#start").is_disabled()
         assert "준비" in page.locator("#phase").inner_text()
         page.locator("#stop").click()

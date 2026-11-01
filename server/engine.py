@@ -113,7 +113,7 @@ class Sender:
             await self.http.close()
             self.http = None
 
-    async def queue_run(self, url, subject, body, limit, delay, before_start=None, password=None):
+    async def queue_run(self, url, subject, body, limit, delay, before_start=None, password=None, cookies=None):
         """Accept one job promptly; all preparation happens in a fresh bot context."""
         url = padlet_url(url)
         async with self.lock:
@@ -126,38 +126,42 @@ class Sender:
             self.limit, self.target_count = limit, 1
             self.automatic, self.opening, self.phase = True, True, "preparing"
             self.ready = False
-            self.log("작업 접수 · 봇 전용 익명 세션을 준비합니다.")
-            self.worker = asyncio.create_task(self.automatic_run(url, subject, body, limit, delay, password))
+            self.log("작업 접수 · 쿠키 로그인 세션을 준비합니다." if cookies else "작업 접수 · 봇 전용 익명 세션을 준비합니다.")
+            self.worker = asyncio.create_task(self.automatic_run(url, subject, body, limit, delay, password, cookies))
         await asyncio.sleep(0)  # Enter the task's cleanup scope before it can be stopped.
 
-    async def automatic_run(self, url, subject, body, limit, delay, password=None):
+    async def automatic_run(self, url, subject, body, limit, delay, password=None, cookies=None):
         stage = "브라우저 시작·게시판 접속"
+        use_cookie = bool(cookies)
         try:
             await self.clear_connection()
             self.browser = BrowserSession(self)
             self.browser.capture_enabled = False
             async with asyncio.timeout(75):
                 try:
-                    if password is None:
+                    if use_cookie:
+                        await self.browser.open(url, password=password, cookies=cookies)
+                    elif password is None:
                         await self.browser.open(url)
                     else:
                         stage = "게시판 비밀번호 확인"
                         await self.browser.open(url, password=password)
                 finally:
                     password = None
+                    cookies = None
                 stage = "경량 페이지 준비"
                 page = await self.browser.sending_page()
                 self.log("경량 전송 준비 · 게시판 화면과 실시간 갱신을 종료했습니다.")
                 board_url = padlet_url(page.url)
                 endpoint = "https://" + urlsplit(board_url).hostname + "/api/9/wishes"
                 transport = BrowserHTTP(page, endpoint)
-                stage = "익명 상태 조회"
+                stage = "쿠키 로그인 상태 조회" if use_cookie else "익명 상태 조회"
                 response = await transport.get(transport.origin + "/api/11/padlet-starting-state" + urlsplit(board_url).path)
-                check_response(response, "익명 상태 조회")
+                check_response(response, stage)
                 state = response.json()
-                if (state.get("user") or {}).get("registered_at", "unknown") is not None:
+                if not use_cookie and (state.get("user") or {}).get("registered_at", "unknown") is not None:
                     raise ValueError("봇의 익명 상태를 확인할 수 없어 중단했습니다.")
-                template = build_template(state)
+                template = build_template(state, use_cookie=use_cookie)
                 stage = "섹션 목록 조회"
                 sections = await read_sections(transport, transport.origin, {}, template["wall_id"])
                 stage = "필수 입력 항목 조회"
@@ -173,7 +177,7 @@ class Sender:
                 return
             self.opening = False
             self.running, self.ready = True, True
-            self.log(f"익명 준비 완료 · 대상 {self.target_count}곳 · 섹션당 {'무제한' if limit == 0 else str(limit) + '건'} · {delay}초마다 전체 섹션 동시 전송", "success")
+            self.log(f"{'쿠키 로그인' if use_cookie else '익명'} 준비 완료 · 대상 {self.target_count}곳 · 섹션당 {'무제한' if limit == 0 else str(limit) + '건'} · {delay}초마다 전체 섹션 동시 전송", "success")
             await self.run(subject, body, limit, delay)
         except asyncio.CancelledError:
             self.phase = "stopped"

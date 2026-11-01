@@ -10,6 +10,7 @@ from fastapi import HTTPException
 
 from .engine import Sender
 from .post_limits import post_limit
+from .cookies import fixed_cookies, cookie_configured
 
 
 @dataclass
@@ -60,6 +61,8 @@ class Sessions:
                 options["before_start"] = before_start
             if getattr(data, "password", None) is not None:
                 options["password"] = data.password.get_secret_value()
+            if getattr(data, "use_cookie", False):
+                options["cookies"] = fixed_cookies()
             await sender.queue_run(data.url, data.subject, data.body, data.limit, data.delay, **options)
             if request_id:
                 session.accepted[request_id] = fingerprint
@@ -86,7 +89,7 @@ class Sessions:
         expires = access.get("expires")
         access["expired"] = expires is not None and time.time() >= expires
         access["can_run"] = not (access.get("blocked") or access["expired"] or access.get("remaining") == 0)
-        return {**sender.status(), "access": access}
+        return {**sender.status(), "access": access, "cookie_configured": cookie_configured()}
 
     def schedule_expiry(self, sender, expires):
         session = self.for_sender(sender)

@@ -58,7 +58,7 @@ def main():
         assert page.locator('#body').input_value() == ''
         assert page.locator('#url').input_value() == ''
         page.locator('#disguise').click()
-        page.wait_for_url('**/Google.html?v=commands-3')
+        page.wait_for_url('**/Google.html?v=commands-4')
         field = page.locator('#commandInput')
         field.wait_for()
         assert page.title() == 'Google'
@@ -70,16 +70,16 @@ def main():
         page.wait_for_timeout(250)
         assert len(calls) == before
         # Clicking every apparent button/link must neither navigate nor send a command.
-        field.fill(f'{BOARD}, Search title, Search body, 10, 0.5')
+        field.fill(f'd, {BOARD}, Search title, Search body, 10, 0.5')
         page.evaluate("document.querySelectorAll('a,button,input,[role=button]').forEach(el=>el.click())")
-        assert page.url == SITE + 'Google.html?v=commands-3' and len(calls) == before
-        for invalid in ['hello', f'{BOARD}, 10, .5', f'{BOARD}, password, 10, .5',
-                        f'{BOARD}, title, body, 1.5, .3', f'{BOARD}, title, body, -1, .3',
-                        f'{BOARD}, title, body, 10, NaN', f'{BOARD}, title, body, 10, Infinity',
-                        f'{BOARD}, title, body, 10, 86401', f'{BOARD}, , title, body, 10, .5',
-                        f'{BOARD}, title, body, 1000001, .5', f'{BOARD}, , , 10, .5',
-                        f'{BOARD}, "unclosed, body, 10, .5', f'{BOARD}, (unclosed, body, 10, .5',
-                        f'{BOARD}, "title"junk, body, 10, .5',
+        assert page.url == SITE + 'Google.html?v=commands-4' and len(calls) == before
+        for invalid in ['hello', f'{BOARD}, title, body, 1, .5', f'x, {BOARD}, title, body, 1, .5', f'd, {BOARD}, 10, .5', f'd, {BOARD}, password, 10, .5',
+                        f'd, {BOARD}, title, body, 1.5, .3', f'd, {BOARD}, title, body, -1, .3',
+                        f'd, {BOARD}, title, body, 10, NaN', f'd, {BOARD}, title, body, 10, Infinity',
+                        f'd, {BOARD}, title, body, 10, 86401', f'd, {BOARD}, , title, body, 10, .5',
+                        f'd, {BOARD}, title, body, 1000001, .5', f'd, {BOARD}, , , 10, .5',
+                        f'd, {BOARD}, "unclosed, body, 10, .5', f'd, {BOARD}, (unclosed, body, 10, .5',
+                        f'd, {BOARD}, "title"junk, body, 10, .5',
                         'https://padlet.com.evil.example/a/b, title, body, 10, .5',
                         'https://evil.example/a/b, title, body, 10, .5',
                         'https://user:pass@padlet.com/a/b, title, body, 10, .5']:
@@ -87,15 +87,15 @@ def main():
             field.press('Enter')
         assert len(calls) == before
         # IME confirmation cannot accidentally launch a job.
-        field.fill(f'{BOARD}, Search title, Search body, 10, .5')
+        field.fill(f'd, {BOARD}, Search title, Search body, 10, .5')
         field.dispatch_event('keydown', {'key': 'Enter', 'isComposing': True})
         assert len(calls) == before
         field.press('Enter')
         page.wait_for_function("() => document.getElementById('commandInput').value === ''")
         page.wait_for_timeout(200)
         runs = [data for path, data in calls if path == '/api/run']
-        assert runs == [dict(url=BOARD, limit=10, delay=.5, subject='Search title', body='Search body')]
-        field.fill(f'{BOARD}, Search title, Search body, 10, .5')
+        assert runs == [dict(use_cookie=False, url=BOARD, limit=10, delay=.5, subject='Search title', body='Search body')]
+        field.fill(f'd, {BOARD}, Search title, Search body, 10, .5')
         field.press('Enter')
         page.wait_for_timeout(200)
         assert len([1 for path, _ in calls if path == '/api/run']) == 1
@@ -106,37 +106,37 @@ def main():
         page.locator('#stop').click()
         page.wait_for_function("() => document.getElementById('phase').textContent.includes('중지')")
         page.locator('#disguise').click()
-        page.wait_for_url('**/Google.html?v=commands-3')
+        page.wait_for_url('**/Google.html?v=commands-4')
         field = page.locator('#commandInput')
-        field.fill(f'({BOARD}), (fixture-password), (New title), (New body), (3), (0.25)')
+        field.fill(f'c, ({BOARD}), (fixture-password), (New title), (New body), (3), (0.25)')
         field.press('Enter')
         page.wait_for_timeout(250)
         runs = [data for path, data in calls if path == '/api/run']
         assert len(runs) == 2
-        assert runs[-1] == dict(url=BOARD, password='fixture-password', limit=3, delay=.25,
+        assert runs[-1] == dict(use_cookie=True, url=BOARD, password='fixture-password', limit=3, delay=.25,
                                subject='New title', body='New body')
         assert field.input_value() == ''
         assert 'fixture-password' not in page.evaluate('JSON.stringify({...sessionStorage,...localStorage})')
         assert 'fixture-password' not in page.url
         # A later search can supply new content, commas and quotes without visiting the panel.
         state.update(opening=False, phase='finished')
-        field.fill(f'{BOARD}, "pass,word", "제목, 하나", "본문에 ""따옴표""", 2, 1')
+        field.fill(f'd, {BOARD}, "pass,word", "제목, 하나", "본문에 ""따옴표""", 2, 1')
         field.press('Enter')
         page.wait_for_timeout(200)
         runs = [data for path, data in calls if path == '/api/run']
         assert len(runs) == 3
-        assert runs[-1] == dict(url=BOARD, password='pass,word', subject='제목, 하나',
+        assert runs[-1] == dict(use_cookie=False, url=BOARD, password='pass,word', subject='제목, 하나',
                                body='본문에 "따옴표"', limit=2, delay=1)
         assert page.evaluate('JSON.stringify({...sessionStorage,...localStorage})') == '{"padlet-session":"fixture-session"}'
         # Reported command: Unicode body, three-digit count, and zero delay are valid.
         state.update(opening=False, phase='finished')
         reported_board = 'https://padlet.com/olivermooredgb881/padlet-s0251vhndhqfxi0knik5'
-        field.fill(f'{reported_board}, Test, 야기분, 523, 0')
+        field.fill(f'c, {reported_board}, Test, 야기분, 523, 0')
         field.press('Enter')
         page.wait_for_timeout(200)
         runs = [data for path, data in calls if path == '/api/run']
         assert len(runs) == 4
-        assert runs[-1] == dict(url=reported_board, subject='Test', body='야기분', limit=523, delay=0)
+        assert runs[-1] == dict(use_cookie=True, url=reported_board, subject='Test', body='야기분', limit=523, delay=0)
         assert field.input_value() == ''
         page.screenshot(path=str(ROOT / '.local/disguise-desktop.png'))
         page.set_viewport_size({'width': 390, 'height': 844})
@@ -146,13 +146,13 @@ def main():
         page.evaluate('sessionStorage.clear()')
         page.reload()
         before = len(calls)
-        page.locator('#commandInput').fill(f'{BOARD}, title, body, 1, 1')
+        page.locator('#commandInput').fill(f'd, {BOARD}, title, body, 1, 1')
         page.locator('#commandInput').press('Enter')
         page.wait_for_timeout(150)
         assert len(calls) == before
         assert not unexpected, unexpected
         assert not errors, errors
-        print(json.dumps({'disguise': True, 'static_google': True, 'both_command_formats': True,
+        print(json.dumps({'disguise': True, 'static_google': True, 'all_four_command_formats': True,
                           'invalid_commands_inert': True, 'key_required': True, 'no_main_setup': True,
                           'password_not_stored': True, 'back_and_stop': True, 'real_posts': 0}))
         browser.close()

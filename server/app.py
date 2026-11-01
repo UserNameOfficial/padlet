@@ -22,7 +22,7 @@ from .post_limits import post_limit, STANDARD_POST_LIMIT
 
 sessions = Sessions()
 key_access = KeyAccess()
-allowed_origins = [s.strip() for s in os.getenv("ALLOWED_ORIGINS", "https://dev-cat0.github.io").split(",") if s.strip()]
+allowed_origins = [s.strip() for s in os.getenv("ALLOWED_ORIGINS", "https://usernameofficial.github.io").split(",") if s.strip()]
 
 
 @asynccontextmanager
@@ -194,13 +194,14 @@ class RunRequest(BaseModel):
     limit: int = Field(default=50, ge=0, le=1000000)
     delay: float = Field(default=0.3, ge=0, le=86400, allow_inf_nan=False)
     password: SecretStr | None = Field(default=None, min_length=1, max_length=1024)
+    use_cookie: bool = False
 
 
 @app.get("/")
 @app.get("/healthz")
 async def health():
     return {"status": "ok", "app": "padlet-sender", "key_auth": "server-v2",
-            "features": {"anonymous_comments": False, "password_boards": True, "password_bootstrap_auth": True}}
+            "features": {"anonymous_comments": False, "password_boards": True, "password_bootstrap_auth": True, "cookie_auth": True}}
 
 
 @app.get("/api/state")

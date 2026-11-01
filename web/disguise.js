@@ -45,7 +45,7 @@
       while (i < text.length && /\s/.test(text[i])) i++;
       if (i < text.length && text[i] !== ',') return null;
       values.push(value.trim());
-      if (values.length > 6) return null;
+      if (values.length > 7) return null;
       if (i < text.length) {
         i++;
         if (!text.slice(i).trim()) values.push('');
@@ -56,7 +56,9 @@
 
   function command(text) {
     const parts = fields(text.trim());
-    if (!parts || (parts.length !== 5 && parts.length !== 6)) return null;
+    if (!parts || (parts.length !== 6 && parts.length !== 7)) return null;
+    const mode = parts.shift();
+    if (mode !== 'd' && mode !== 'c') return null;
     const [address] = parts;
     let url;
     try { url = new URL(address); } catch (_) { return null; }
@@ -70,7 +72,7 @@
     if (!Number.isSafeInteger(limit) || limit > 1000000 || !Number.isFinite(delay) || delay > 86400) return null;
     const subject = parts.at(-4), body = parts.at(-3);
     if ((!subject && !body) || subject.length > 1000 || body.length > 20000) return null;
-    const result = {url: address, subject, body, limit, delay};
+    const result = {url: address, subject, body, limit, delay, use_cookie: mode === 'c'};
     if (parts.length === 6) {
       if (!parts[1] || parts[1].length > 1024) return null;
       result.password = parts[1];
