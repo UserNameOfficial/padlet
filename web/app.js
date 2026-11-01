@@ -45,20 +45,10 @@ $('keyForm').onsubmit=async event=>{
 };
 $('reauth').onclick=beginAuth;
 $('disguise').onclick=()=>{
-  try {
-    sessionStorage.setItem('padlet-disguise-draft', JSON.stringify({subject:$('subject').value,body:$('body').value}));
-  } catch (_) {
-    notice('브라우저의 탭 저장소를 사용할 수 없어 위장 화면으로 이동하지 못했습니다.');
-    return;
-  }
+  try { sessionStorage.removeItem('padlet-disguise-draft'); } catch (_) {}
   $('boardPassword').value='';
   window.location.assign('./Google.html');
 };
-try {
-  const draft=JSON.parse(sessionStorage.getItem('padlet-disguise-draft')||'{}');
-  if(typeof draft.subject==='string') $('subject').value=draft.subject;
-  if(typeof draft.body==='string') $('body').value=draft.body;
-} catch (_) {}
 function accessBlocked(access) {
   return !access?.known || access.can_run===false || access.remaining===0 ||
     (access.expires!==null && access.expires!==undefined && Date.now()>=access.expires*1000);

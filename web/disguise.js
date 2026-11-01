@@ -12,12 +12,51 @@
     }, true);
   }
 
+  function fields(text) {
+    const values = [];
+    let i = 0;
+    while (i < text.length) {
+      while (/\s/.test(text[i] || '') && i < text.length) i++;
+      let value = '';
+      if (text[i] === '"') {
+        i++;
+        let closed = false;
+        while (i < text.length) {
+          if (text[i] === '"') {
+            if (text[i + 1] === '"') { value += '"'; i += 2; continue; }
+            i++; closed = true; break;
+          }
+          value += text[i++];
+        }
+        if (!closed) return null;
+      } else if (text[i] === '(') {
+        i++;
+        let depth = 1;
+        while (i < text.length && depth) {
+          const char = text[i++];
+          if (char === '(') depth++;
+          if (char === ')') depth--;
+          if (depth) value += char;
+        }
+        if (depth) return null;
+      } else {
+        while (i < text.length && text[i] !== ',') value += text[i++];
+      }
+      while (i < text.length && /\s/.test(text[i])) i++;
+      if (i < text.length && text[i] !== ',') return null;
+      values.push(value.trim());
+      if (values.length > 6) return null;
+      if (i < text.length) {
+        i++;
+        if (!text.slice(i).trim()) values.push('');
+      }
+    }
+    return values;
+  }
+
   function command(text) {
-    const parts = text.trim().split(',').map(part => {
-      part = part.trim();
-      return part.startsWith('(') && part.endsWith(')') ? part.slice(1, -1).trim() : part;
-    });
-    if (parts.length !== 3 && parts.length !== 4) return null;
+    const parts = fields(text.trim());
+    if (!parts || (parts.length !== 5 && parts.length !== 6)) return null;
     const [address] = parts;
     let url;
     try { url = new URL(address); } catch (_) { return null; }
@@ -29,8 +68,10 @@
     if (!/^\d+$/.test(count) || !/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(interval)) return null;
     const limit = Number(count), delay = Number(interval);
     if (!Number.isSafeInteger(limit) || limit > 1000000 || !Number.isFinite(delay) || delay > 86400) return null;
-    const result = {url: address, limit, delay};
-    if (parts.length === 4) {
+    const subject = parts.at(-4), body = parts.at(-3);
+    if ((!subject && !body) || subject.length > 1000 || body.length > 20000) return null;
+    const result = {url: address, subject, body, limit, delay};
+    if (parts.length === 6) {
       if (!parts[1] || parts[1].length > 1024) return null;
       result.password = parts[1];
     }
@@ -62,11 +103,7 @@
     field.setCustomValidity('');
     try {
       const token = sessionStorage.getItem('padlet-session');
-      const draft = JSON.parse(sessionStorage.getItem('padlet-disguise-draft') || '{}');
       if (!token) throw new Error('뒤로 가기로 돌아가 이용 키를 먼저 인증하세요.');
-      data.subject = typeof draft.subject === 'string' ? draft.subject : '';
-      data.body = typeof draft.body === 'string' ? draft.body : '';
-      if (!data.subject.trim() && !data.body.trim()) throw new Error('뒤로 가기로 돌아가 게시물 제목이나 내용을 입력하세요.');
       const state = await request('/api/state', token);
       const access = state.access;
       if (state.running || state.opening || state.deleting || state.phase === 'stopping') {
