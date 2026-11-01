@@ -22,6 +22,9 @@ def main():
                     return route.fulfill(status=403,json={'detail':'사용할 수 없는 키입니다.'})
                 return route.fulfill(json={'token':'fixture'})
             if path=="/api/state": return route.fulfill(json=state)
+            if path=="/api/custom-cookie":
+                state['custom_cookie_active']=route.request.post_data_json['cookie'] is not None
+                return route.fulfill(json=state)
             if path=="/api/run":
                 assert len(route.request.headers['x-request-id']) >= 16
                 calls.append(route.request.post_data_json)
@@ -59,11 +62,19 @@ def main():
         page.locator('#keySubmit').click()
         page.wait_for_function("() => !document.getElementById('start').disabled")
         assert page.locator('#authGate').is_hidden()
-        assert page.locator("#sendForm input,#sendForm textarea").count()==8
+        assert page.locator("#sendForm input,#sendForm textarea").count()==10
         assert not page.locator('#useCookie').is_checked()
-        assert page.locator('input[id*=cookie i],textarea[id*=cookie i]').count() == 1
+        assert page.locator('#customCookie').get_attribute('autocomplete') == 'off'
         assert page.locator('#passwordSettings').is_hidden()
         assert page.locator('#boardPassword').is_disabled()
+        page.locator('#customCookieEnabled').check()
+        page.locator('#customCookie').fill('ww_p=fixture-secret; ww_s=fixture-session')
+        page.locator('#saveCustomCookie').click()
+        page.wait_for_function("() => document.getElementById('customCookieStatus').textContent.includes('활성화')")
+        assert page.locator('#customCookie').input_value() == ''
+        assert 'fixture-secret' not in page.evaluate('JSON.stringify({...sessionStorage,...localStorage})')
+        page.locator('#customCookieEnabled').uncheck()
+        page.wait_for_function("() => document.getElementById('customCookieStatus').textContent.includes('기본 쿠키')")
         page.locator('#passwordEnabled').check()
         assert page.locator('#passwordSettings').is_visible()
         assert not page.locator('#boardPassword').evaluate('el => el.checkValidity()')

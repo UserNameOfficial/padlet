@@ -19,6 +19,7 @@ from .key_access import KeyAccess
 from .license_admin import routes as license_routes
 from .audit import worker as audit_worker
 from .post_limits import post_limit, STANDARD_POST_LIMIT
+from .cookies import parse_cookie_header
 
 sessions = Sessions()
 key_access = KeyAccess()
@@ -88,7 +89,7 @@ async def login(data: LoginRequest, request: Request, origin: str = Header(defau
 async def validation_error(request: Request, error):
     if request.url.path == "/api/auth/login" or request.url.path.startswith('/internal/'):
         return JSONResponse(status_code=422, content={"detail": "5자리 영문·숫자 키를 입력하세요."})
-    if request.url.path == "/api/run":
+    if request.url.path in {"/api/run", "/api/custom-cookie"}:
         # Validation errors must never echo the supplied board password.
         return JSONResponse(status_code=422, content={"detail": [
             {"loc": item["loc"], "msg": item["msg"], "type": item["type"]}
@@ -195,6 +196,24 @@ class RunRequest(BaseModel):
     delay: float = Field(default=0.3, ge=0, le=86400, allow_inf_nan=False)
     password: SecretStr | None = Field(default=None, min_length=1, max_length=1024)
     use_cookie: bool = False
+
+
+class CustomCookieRequest(BaseModel):
+    cookie: SecretStr | None = Field(default=None, min_length=1, max_length=16384)
+
+
+@app.post("/api/custom-cookie")
+async def custom_cookie(data: CustomCookieRequest, sender: Sender = Depends(authorize)):
+    async with sessions.browser_lock:
+        if sender.running or sender.opening or sender.deleting:
+            raise HTTPException(409, "진행 중인 작업이 끝난 뒤 쿠키를 변경하세요.")
+        if data.cookie:
+            try:
+                parse_cookie_header(data.cookie.get_secret_value())
+            except ValueError as error:
+                raise HTTPException(400, str(error)) from None
+        sessions.for_sender(sender).custom_cookie = data.cookie
+    return sessions.status(sender)
 
 
 @app.get("/")

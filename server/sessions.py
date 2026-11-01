@@ -7,10 +7,11 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from fastapi import HTTPException
+from pydantic import SecretStr
 
 from .engine import Sender
 from .post_limits import post_limit
-from .cookies import fixed_cookies, cookie_configured
+from .cookies import fixed_cookies, cookie_configured, parse_cookie_header
 
 
 @dataclass
@@ -21,6 +22,7 @@ class PanelSession:
     accepted: dict = field(default_factory=dict)
     expiry_task: asyncio.Task | None = None
     access: dict = field(default_factory=lambda: {"known": False})
+    custom_cookie: SecretStr | None = field(default=None, repr=False)
 
 
 class Sessions:
@@ -62,7 +64,8 @@ class Sessions:
             if getattr(data, "password", None) is not None:
                 options["password"] = data.password.get_secret_value()
             if getattr(data, "use_cookie", False):
-                options["cookies"] = fixed_cookies()
+                options["cookies"] = (parse_cookie_header(session.custom_cookie.get_secret_value())
+                                      if session.custom_cookie else fixed_cookies())
             await sender.queue_run(data.url, data.subject, data.body, data.limit, data.delay, **options)
             if request_id:
                 session.accepted[request_id] = fingerprint
@@ -89,7 +92,8 @@ class Sessions:
         expires = access.get("expires")
         access["expired"] = expires is not None and time.time() >= expires
         access["can_run"] = not (access.get("blocked") or access["expired"] or access.get("remaining") == 0)
-        return {**sender.status(), "access": access, "cookie_configured": cookie_configured()}
+        return {**sender.status(), "access": access, "cookie_configured": cookie_configured(),
+                "custom_cookie_active": self.for_sender(sender).custom_cookie is not None}
 
     def schedule_expiry(self, sender, expires):
         session = self.for_sender(sender)

@@ -46,7 +46,7 @@ $('keyForm').onsubmit=async event=>{
 $('reauth').onclick=beginAuth;
 $('disguise').onclick=()=>{
   try { sessionStorage.removeItem('padlet-disguise-draft'); } catch (_) {}
-  $('boardPassword').value='';
+  $('boardPassword').value='';$('customCookie').value='';
   window.location.assign('./Google.html?v=commands-4');
 };
 function accessBlocked(access) {
@@ -86,8 +86,9 @@ function render(next) {
     (next.delete_untracked?' · 추적 불가 '+next.delete_untracked+'건':'')+
     (next.delete_errors?' · 삭제 오류 '+next.delete_errors+'건':'')+
     (next.delete_retry_after?' · '+next.delete_retry_after+'초 후 재시도':'');
-  for(const id of ['url','subject','body','limit','delay','passwordEnabled','useCookie']) $(id).disabled=active||submitting;
+  for(const id of ['url','subject','body','limit','delay','passwordEnabled','useCookie','customCookieEnabled']) $(id).disabled=active||submitting;
   renderPassword(active||submitting);
+  renderCustomCookie(active||submitting);
   $('sent').textContent=next.sent;
   $('errors').textContent=next.errors;
   $('phase').textContent=phases[next.phase]||next.phase;
@@ -119,6 +120,37 @@ async function connect(){
     $('authGate').hidden=true;$('panel').inert=false;notice();render(next);poll(current);
   }catch(error){notice(message(error));if(error.status===401){beginAuth();return;}authMessage(message(error));timer=setTimeout(connect,3000);}
 }
+function renderCustomCookie(busy=false) {
+  const enabled=$('customCookieEnabled').checked;
+  $('customCookieSettings').hidden=!enabled;
+  $('customCookie').disabled=busy||!enabled;
+  $('saveCustomCookie').disabled=busy||!enabled||!connected;
+  $('clearCustomCookie').disabled=busy||!enabled||!connected||!state?.custom_cookie_active;
+  $('customCookieStatus').textContent=state?.custom_cookie_active?'커스텀 쿠키 활성화 · 이 접속 세션에서만 사용':'기본 쿠키 사용 · 커스텀 쿠키를 저장하면 전환됩니다.';
+}
+$('customCookieEnabled').onchange=()=>{
+  if(!$('customCookieEnabled').checked) {
+    $('customCookie').value='';
+    if(state?.custom_cookie_active) $('clearCustomCookie').onclick();
+  }
+  renderCustomCookie();
+};
+$('saveCustomCookie').onclick=async()=>{
+  if(!connected||submitting||state?.running||state?.opening||state?.deleting)return;
+  const value=$('customCookie').value.trim();
+  if(!value){notice('쿠키를 입력하세요.');return;}
+  submitting=true;notice();
+  try{render(await api('/api/custom-cookie',{cookie:value}));$('customCookie').value='';}
+  catch(error){notice(message(error));}
+  finally{submitting=false;if(state)render(state);}
+};
+$('clearCustomCookie').onclick=async()=>{
+  if(!connected||submitting||state?.running||state?.opening||state?.deleting)return;
+  submitting=true;notice();
+  try{render(await api('/api/custom-cookie',{cookie:null}));$('customCookie').value='';}
+  catch(error){notice(message(error));}
+  finally{submitting=false;if(state)render(state);}
+};
 function renderPassword(busy=false) {
   const enabled=$('passwordEnabled').checked;
   $('passwordSettings').hidden=!enabled;
@@ -141,7 +173,7 @@ $('sendForm').onsubmit=async event=>{
     render(await api('/api/run',data, {'X-Request-ID':crypto.randomUUID()}));
   }
   catch(error){notice(message(error));try{render(await api('/api/state'));}catch(_){connected=false;}}
-  finally{$('boardPassword').value='';submitting=false;if(state)render(state);}
+  finally{$('boardPassword').value='';$('customCookie').value='';submitting=false;if(state)render(state);}
 };
 $('stop').onclick=async()=>{ $('stop').disabled=true;try{render(await api('/api/stop',{}));}catch(error){notice(message(error));if(state)render(state);}};
 $('emergencyDelete').onclick=async()=>{
@@ -151,7 +183,7 @@ $('emergencyDelete').onclick=async()=>{
   catch(error){notice(message(error));try{render(await api('/api/state'));}catch(_){connected=false;}}
   finally{submitting=false;if(state)render(state);}
 };
-window.addEventListener('pagehide',()=>{generation++;authGeneration++;clearTimeout(timer);});
+window.addEventListener('pagehide',()=>{$('customCookie').value='';generation++;authGeneration++;clearTimeout(timer);});
 window.addEventListener('pageshow',event=>{if(event.persisted)connect();});
 setInterval(()=>{if(state&&token)renderAccess(state);},500);
 connect();
