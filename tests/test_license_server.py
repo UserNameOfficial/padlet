@@ -41,6 +41,28 @@ def issue(store, amount=1, kind='uses'):
     return item
 
 
+def test_custom_key_management_and_web_login(ledger):
+    from server.app import app
+    with TestClient(app) as client:
+        payload = {'actor': OWNER_ID, 'user': 111, 'key': '커스텀-Test 키!'}
+        assert client.post('/internal/licenses/prepare_custom', json=payload).status_code == 401
+        assert client.post(**signed('prepare_custom', {**payload, 'actor': 111})).status_code == 403
+        assert client.post(**signed('prepare_custom', {**payload, 'user': None})).status_code == 403
+        response = client.post(**signed('prepare_custom', payload))
+        assert response.status_code == 200, response.text
+        item = response.json()
+        assert item['remaining'] is None and item['expires'] is None
+        duplicate = client.post(**signed('prepare_custom', payload))
+        assert duplicate.status_code == 403 and '이미 발급' in duplicate.json()['detail']
+        headers = {'Origin': 'https://usernameofficial.github.io'}
+        assert client.post('/api/auth/login', headers=headers, json={'key': payload['key']}).status_code == 403
+        assert client.post(**signed('delivered', {'actor': 222, 'license_id': item['id']})).status_code == 403
+        assert client.post(**signed('delivered', {'actor': 111, 'license_id': item['id']})).status_code == 200
+        login = client.post('/api/auth/login', headers=headers, json={'key': '커스텀-test 키!'})
+        assert login.status_code == 200, login.text
+        assert set(login.json()) == {'token'} and payload['key'] not in login.text
+
+
 @pytest.mark.parametrize('kind', ['uses', 'days', 'month', 'year', 'forever'])
 @pytest.mark.parametrize('limit', [0, 5000, 5001])
 @pytest.mark.parametrize('endpoint', ['/api/run', '/api/start'])

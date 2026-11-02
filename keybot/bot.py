@@ -171,19 +171,24 @@ class Bot(discord.Client):
         self.logs_configured = True
         logging.getLogger(__name__).info('키 서버 및 로그 채널 연결 완료')
 
-    async def deliver(self, interaction, user, grant_id):
+    async def deliver(self, interaction, user, grant_id=None, *, custom_key=None):
         # Serialize DM delivery; DB transactions also protect duplicate button interactions.
         async with self.delivery_lock:
             license = None
             try:
-                license = await asyncio.to_thread(self.store.prepare, user.id, grant_id)
+                if custom_key is None:
+                    license = await asyncio.to_thread(self.store.prepare, user.id, grant_id)
+                else:
+                    license = await asyncio.to_thread(self.store.prepare_custom, interaction.user.id, user.id, custom_key)
                 if license["remaining"] is not None:
                     condition = f"실행 버튼 접수 {license['remaining']}회"
                 elif license["expires"]:
                     condition = datetime.fromtimestamp(license["expires"], KST).strftime("%Y-%m-%d %H:%M:%S KST까지")
                 else:
                     condition = "영구"
-                await user.send(f"Padlet 이용 키: **`{license['key']}`**\n이용 조건: {condition}\n"
+                displayed_key = (f"**`{license['key']}`**" if custom_key is None
+                                 else discord.utils.escape_markdown(license['key']))
+                await user.send(f"Padlet 이용 키: {displayed_key}\n이용 조건: {condition}\n"
                                 f"발급 번호: `{license['id']}`\n"
                                 "웹사이트에 접속한 뒤 키 입력 창에서 인증하세요.\n"
                                 "키를 아는 사람은 이용할 수 있으므로 타인에게 공유하지 마세요.")
@@ -248,6 +253,14 @@ class Bot(discord.Client):
                          수량: app_commands.Range[int, 1, 100] = 1):
             value = 기간.value
             await grant(interaction, 대상, "days" if value.isdigit() else value, int(value) if value.isdigit() else 1, 수량)
+
+        @self.tree.command(name="커스텀키발급", description="관리자: 지정한 문자열로 영구 키를 발급하고 대상자에게 DM 전송")
+        @app_commands.check(owner)
+        @app_commands.describe(대상="키를 받을 사용자", 키="원하는 키 문자열 (1~64자, 영문 대소문자 구분 없음)")
+        async def custom(interaction: discord.Interaction, 대상: discord.Member,
+                         키: app_commands.Range[str, 1, 64]):
+            await interaction.response.defer(ephemeral=True)
+            await self.deliver(interaction, 대상, custom_key=키)
 
         @self.tree.command(name="키폐기", description="관리자: DM에 있는 발급 번호로 키 폐기")
         @app_commands.check(owner)

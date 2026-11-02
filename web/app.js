@@ -22,14 +22,14 @@ function beginAuth(){
   try{sessionStorage.removeItem('padlet-session');}catch(_){}
   $('authGate').hidden=false;$('panel').inert=true;$('start').disabled=true;
   $('connection').textContent='키 인증 필요';$('accessKey').value='';
-  authMessage('디스코드 DM으로 받은 5자리 키를 입력하세요.');
+  authMessage('디스코드 DM으로 받은 이용 키를 입력하세요.');
   $('accessKey').focus();
 }
 $('keyForm').onsubmit=async event=>{
   event.preventDefault();if(authenticating)return;
   authenticating=true;const current=++authGeneration;
   $('keySubmit').disabled=true;authMessage('키를 확인하고 있습니다…');
-  const body={key:$('accessKey').value.trim().toUpperCase()};
+  const body={key:$('accessKey').value.trim()};
   $('accessKey').value='';
   try{
     const request=api('/api/auth/login',body,{},'');

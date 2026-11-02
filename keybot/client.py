@@ -45,6 +45,13 @@ class RemoteStore:
             return result
         except HTTPError as error:
             self.connected = False
+            if action == 'prepare_custom' and error.code == 403:
+                try:
+                    detail = json.load(error).get('detail')
+                except (ValueError, AttributeError):
+                    detail = None
+                if isinstance(detail, str):
+                    raise LicenseError(detail) from None
             if error.code in {401, 403, 409}:
                 raise LicenseError('요청이 거부되었습니다. 관리자 권한·발급권·서버 연결 설정을 확인하세요.') from None
             raise LicenseError('키 서버가 응답하지 않습니다. 잠시 후 다시 시도하세요.') from None
@@ -63,6 +70,10 @@ class RemoteStore:
 
     def delivered(self, license_id, user):
         return self.call('delivered', user, license_id=license_id)
+
+    def prepare_custom(self, actor, user, key):
+        self.require_owner(actor)
+        return self.call('prepare_custom', actor, user=user, key=key)
 
     def delivery_failed(self, license_id, user):
         return self.call('delivery_failed', user, license_id=license_id)

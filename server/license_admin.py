@@ -23,6 +23,7 @@ class AdminRequest(BaseModel):
     webhook: str = Field(default='', max_length=500)
     event_id: str = Field(default='', max_length=100, pattern=r'^[A-Za-z0-9_-]*$')
     delivered: bool = False
+    key: str = Field(default='', max_length=64)
 
 
 def routes(access, sessions):
@@ -59,6 +60,10 @@ def routes(access, sessions):
                     raise LicenseError('본인의 문의만 조회할 수 있습니다.')
                 return {'channel': await asyncio.to_thread(store.ticket, data.guild, data.user, data.channel)}
             store.require_owner(data.actor)
+            if action == 'prepare_custom':
+                if data.user is None:
+                    raise LicenseError('대상이 필요합니다.')
+                return await asyncio.to_thread(store.prepare_custom, data.actor, data.user, data.key)
             if action == 'audit_next':
                 event = await asyncio.to_thread(store.next_event)
                 return {'event': {'id': str(event['id']), 'content': event_message(event)['content']} if event else None}

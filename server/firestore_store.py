@@ -9,7 +9,7 @@ import time
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from .license_store import LicenseError, RateLimited, Store, expiry, KINDS
+from .license_store import LicenseError, RateLimited, Store, expiry, KINDS, custom_key
 
 
 class FirestoreStore:
@@ -112,6 +112,25 @@ class FirestoreStore:
             tx.create(self.ref('pending_delivery', identifier), {'recover_at': now + 600})
             remaining = grant['remaining'] - 1
             tx.update(grant_ref, {'remaining': remaining, 'available_scope': grant['available_scope'] if remaining else ''})
+            return {'key': key, 'id': identifier, **self.balance(row)}
+        return self.tx(commit)
+
+    def prepare_custom(self, actor, user, value):
+        self.require_owner(actor)
+        key = custom_key(value)
+        identifier = secrets.token_urlsafe(24)
+        def commit(tx):
+            epoch = self.epoch(tx)
+            key_ref = self.ref('key_hashes', self.digest(key))
+            if self.read(tx, key_ref):
+                raise LicenseError('이미 발급된 키입니다. 다른 문자열을 입력하세요.')
+            now = time.time()
+            row = {'id': identifier, 'user_id': str(user), 'grant_id': 0,
+                   'kind': 'forever', 'amount': 1, 'epoch': epoch,
+                   'remaining': None, 'expires': None, 'state': 'pending', 'created': now}
+            tx.create(self.ref('licenses', identifier), row)
+            tx.create(key_ref, {'license_id': identifier})
+            tx.create(self.ref('pending_delivery', identifier), {'recover_at': now + 600})
             return {'key': key, 'id': identifier, **self.balance(row)}
         return self.tx(commit)
 

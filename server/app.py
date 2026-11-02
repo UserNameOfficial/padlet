@@ -71,8 +71,8 @@ class LoginRequest(BaseModel):
 async def login(data: LoginRequest, request: Request, origin: str = Header(default="")):
     check_origin(origin)
     client_id = key_access.login_limit(request.client.host if request.client else "unknown")
-    key = data.key.strip().upper()
-    if not re.fullmatch(r"[A-Z0-9]{5}", key):
+    key = data.key.strip()
+    if not key or not key.isprintable():
         raise HTTPException(403, "사용할 수 없는 키입니다.")
     result = await key_access.rpc("verify_key", "", key=key, client_id=client_id)
     license_id = result.get("license_id")

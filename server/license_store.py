@@ -24,6 +24,13 @@ class RateLimited(LicenseError):
     pass
 
 
+def custom_key(value):
+    key = value.strip()
+    if not 1 <= len(key) <= 64 or not key.isprintable():
+        raise LicenseError("키는 줄바꿈 없는 1~64자 문자열로 입력하세요.")
+    return key
+
+
 def expiry(kind, amount, now):
     start = datetime.fromtimestamp(now, KST)
     if kind == "days":
@@ -130,6 +137,17 @@ class Store:
                        (license_id, self.digest(key), str(user), grant_id, remaining, until, "pending", now))
             db.execute("UPDATE grants SET remaining=remaining-1 WHERE id=?", (grant_id,))
             return {"key": key, "id": license_id, "remaining": remaining, "expires": until}
+
+    def prepare_custom(self, actor, user, value):
+        self.require_owner(actor)
+        key = custom_key(value)
+        with self.db() as db:
+            if db.execute('SELECT 1 FROM licenses WHERE digest=?', (self.digest(key),)).fetchone():
+                raise LicenseError("이미 발급된 키입니다. 다른 문자열을 입력하세요.")
+            identifier = secrets.token_urlsafe(24)
+            db.execute('INSERT INTO licenses VALUES(?,?,?,?,?,?,?,?)',
+                       (identifier, self.digest(key), str(user), 0, None, None, 'pending', time.time()))
+            return {'key': key, 'id': identifier, 'remaining': None, 'expires': None}
 
     def delivered(self, license_id, user=None):
         with self.db() as db:
@@ -258,8 +276,9 @@ class Store:
                    (event_type, json.dumps(payload), time.time()))
 
     def license_event(self, db, kind, license_id):
-        row = db.execute('SELECT l.id,l.user_id,l.remaining,l.expires,g.kind,g.amount FROM licenses l '
-                         'JOIN grants g ON g.id=l.grant_id WHERE l.id=?', (license_id,)).fetchone()
+        row = db.execute("SELECT l.id,l.user_id,l.remaining,l.expires,COALESCE(g.kind,'forever') AS kind,"
+                         'COALESCE(g.amount,1) AS amount FROM licenses l '
+                         'LEFT JOIN grants g ON g.id=l.grant_id WHERE l.id=?', (license_id,)).fetchone()
         self.event(db, kind, **dict(row))
 
     def set_webhook(self, url):

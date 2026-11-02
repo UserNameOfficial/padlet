@@ -18,7 +18,7 @@ def main():
             requests.append((route.request.url,route.request.post_data or ''))
             path=urlsplit(route.request.url).path
             if path=="/api/auth/login":
-                if route.request.post_data_json != {'key':'A1B2C'}:
+                if route.request.post_data_json.get('key', '').upper() not in {'A1B2C', '커스텀-테스트!'}:
                     return route.fulfill(status=403,json={'detail':'사용할 수 없는 키입니다.'})
                 return route.fulfill(json={'token':'fixture'})
             if path=="/api/state": return route.fulfill(json=state)
@@ -55,6 +55,12 @@ def main():
         page.locator('#authStatus').filter(has_text='사용할 수 없는 키').wait_for()
         assert page.locator('#authGate').is_visible()
         assert page.locator('#accessKey').input_value() == ''
+        page.locator('#accessKey').fill('커스텀-테스트!')
+        assert page.locator('#accessKey').evaluate('el => el.checkValidity()')
+        page.locator('#keySubmit').click()
+        page.wait_for_function("() => !document.getElementById('start').disabled")
+        assert page.locator('#authGate').is_hidden()
+        page.locator('#reauth').click()
         page.locator('#accessKey').fill('a1b2c')
         page.locator('#keySubmit').click()
         page.wait_for_function("() => !document.getElementById('start').disabled")
